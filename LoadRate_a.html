@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv = "X-UA-Compatible" content = "IE = edge" charset = "UTF-8"/> 
+		<title>ActualLoadRate</title>
+		<link rel = "stylesheet" href = "../src/main/webapp/pages/css/wanma.css"/>
+		<link rel = "stylesheet" href = "../src/main/webapp/tools/easyui/themes/default/easyui.css"/>
+		<link rel = "stylesheet" href = "../src/main/webapp/tools/easyui/themes/icon.css"/>
+		
+		<script type = "text/javascript" src = "../src/main/webapp/tools/tssJS/tssJS.all.js"></script>
+		
+		<script type = "text/javascript" src = "../src/main/webapp/tools/easyui/jquery.min.js"></script>
+		<script type = "text/javascript" src = "../src/main/webapp/tools/easyui/jquery.easyui.min.js"></script>
+		<script type = "text/javascript" src = "../src/main/webapp/tools/easyui/easyui-lang-zh_CN.js"></script>
+		<!--
+		<script type = "text/javascript" src = "../src/main/webapp/tools/echarts/echarts-all-2.1.10.js"></script>
+		<script type = "text/javascript" src = "../src/main/webapp/more/bi_template/echart.js"></script>-->
+		<script type = "text/javascript" src = "../src/main/webapp/more/bi_template/common.js"></script>
+		<script type = "text/javascript" src = "../src/main/webapp/pages/js/common.js"></script>
+		<style type = "text/css">
+			html, body {
+				height: 100%
+			}
+			
+			#tb {
+				padding-bottom: 5px;
+				padding-top: 5px;
+				padding-left: 25px;
+			}
+		</style>
+		<script type = "text/javascript">
+		
+			var data,
+				method = "POST", 
+				DATA_URL = "http://10.9.45.64:8080/tss/data/json/2150", 
+				params = {"param1": "2016-07-08"};
+				
+			
+			$(function(){
+			
+				tssJS.ajax({
+					url: DATA_URL,
+					params: params,
+					method: method,
+					type: "json",
+					waiting: true,
+					ondata: function(){
+						data =  this.getResponseJSON();
+						f1 = showGrid(data);
+						$("#real").datagrid({
+							toolbar: "#tb",
+							fit: true,
+							title: params.param1.split('-')[0]+params.param1.split('-')[1]+"货量装载率统计",
+							frozenColumns:[f1[0][0].slice(0,4), f1[0][1].slice(0,2)],
+							columns: [f1[0][0].slice(4), f1[0][1].slice(2)],
+							data: {"total":f1[1].length, "rows":f1[1]}
+						});
+					}
+				});	
+				
+				$("#save").click(function(){
+					$(this)[0].download = params.param1.split('-')[0]+params.param1.split('-')[1]+"货量装载率统计.csv";
+					this.href = "data:text/csv;charset=utf-8,\ufeff" + encodeURIComponent(saveTable(f1));
+				});
+					
+			});
+
+			function showGrid(data){
+				var daylist = [], gridData = [], route_obj = {};
+				$.each(data, function(i, item){
+					var t = item.schedule_id+"_"+item.route_name+"_"+item.in_to;
+					if(!daylist.contains(item.day)){
+						daylist.push(item.day);
+					};
+					if(!route_obj.hasOwnProperty(t)){
+						route_obj[t] = [];
+					}
+					route_obj[t].push({"day": item.day, "weight": item.weight, "loadrate": item.loadrate});
+				});
+				
+				
+				for(var key in route_obj){
+					var avg_w = 0, avg_r = 0, temp = {}, j = 0;
+					 temp["id"] = key.split("_")[0];
+					 temp["route_name"] = key.split("_")[1];
+					 temp["route_split"] = key.split("_")[2];
+					 temp["weight"] = 0, temp["loadrate"] = 0;
+					for(var i = 0; i < daylist.length; i++){
+						if(route_obj[key][j] != undefined && daylist[i] == route_obj[key][j]["day"]){
+							temp["weight"+i] = route_obj[key][j]["weight"];
+							temp["loadrate"+i] = route_obj[key][j]["loadrate"];
+							avg_w += route_obj[key][j]["weight"];
+							avg_r += parseFloat(route_obj[key][j]["loadrate"].substr(0, route_obj[key][j]["loadrate"].length-1));
+							j++;
+						}else{
+							//缺失值处理
+							temp["weight"+i] = '-';
+							temp["loadrate"+i] = '-';
+						}
+		
+					}
+					avg_w = avg_w/j;
+					avg_r = avg_r/j;
+					temp["weight"] = Math.round(avg_w*100)/100;
+					temp["loadrate"] = Math.round(avg_r*100)/100+"%";
+					gridData.push(temp);
+				}
+				
+				//列名
+				var chtml = [], chtml1 = [], chtml2 = [];
+				
+				chtml1 = [{field: "id", title: "班车编码", width: "8%", rowspan: 2, align: "center"},
+				{field: "route_name", title: "规划线路", width: "8%", rowspan: 2, align: "center"},
+				{field: "route_split", title: "分段线路", width: "8%", rowspan: 2, align: "center"}];
+				
+				chtml1.push({field: "day", title: "月均值", width: "8%", colspan: 2, align: "center"});
+				chtml2.push({field: "weight", title: "月均货量", width: "5%", align: "right"});
+				chtml2.push({field: "loadrate", title: "月均装载率", width: "5%", align: "right", formatter: val_style});
+				
+				for(i = 0; i < daylist.length; i++){
+					chtml1.push({field: "day"+i, title: daylist[i], width: "8%", colspan: 2, align: "center"});
+					chtml2.push({field: "weight"+i, title: "货量", width: "5%", align: "right"});
+					chtml2.push({field: "loadrate"+i, title: "装载率", width: "5%", align: "right", formatter: val_style});
+				}
+				
+				chtml.push(chtml1);
+				chtml.push(chtml2);
+				
+				return [chtml, gridData];
+			}
+			
+			function saveTable(data){
+				var str = "";
+				var title = data[0]
+				var cols = data[1];
+				
+				//thead
+				for(var i = 0; i < data[0][0].length; i++){
+					if(i < 3){
+						str += data[0][0][i]["title"]+",";
+					}else{
+						str += data[0][0][i]["title"]+","+""+",";
+					}
+					
+				}
+				str = str.substr(0, str.length-1) + "\n"+""+","+""+","+""+",";
+				for(j = 0; j < data[0][1].length; j++){
+					str += data[0][1][j]["title"]+",";
+				}
+				str = str.substr(0, str.length-1) + "\n";
+				
+				//tbody
+				for(var k = 0; k < data[1].length; k++){
+					for(var key in data[1][k]){
+						str += 	data[1][k][key]+",";
+					}
+					str = str.substr(0, str.length-1) + "\n";
+					
+				}
+				return str;
+			}	
+			
+			function val_style(value, row, index){
+				if(parseFloat(value.substr(0, value.length-1)) > 85){
+					return '<span style="color:red;font-weight:bold">'+value+'</span>';
+				}else if(parseFloat(value.substr(0, value.length-1)) < 40){
+					return '<span style="color:green;font-weight:bold">'+value+'</span>';
+				}else{
+					return value;
+				}
+			};
+			
+			function filter(){
+				var f1 = showGrid(data),
+					filter_data = [],
+					filter_condition = $("#combo").combobox("getText");
+					filter_text = $("#text").textbox("getText");
+					for(var i = 0; i< f1[1].length; i++){
+						if(filter_condition == "规划线路"){
+							if(f1[1][i]["route_name"] == filter_text){
+								filter_data.push(f1[1][i]);
+							};
+						}else if(filter_condition == "班车编码"){
+							if(f1[1][i]["id"] == filter_text){
+								filter_data.push(f1[1][i]);
+							};
+						}else{
+							if(f1[1][i]["route_split"] == filter_text){
+								filter_data.push(f1[1][i]);
+							};
+						};
+					};
+					
+					$("#real").datagrid({
+							toolbar: "#tb",
+							fit: true,
+							title: params.param1.split('-')[0]+params.param1.split('-')[1]+"货量装载率统计",
+							frozenColumns:[f1[0][0].slice(0,4), f1[0][1].slice(0,2)],
+							columns: [f1[0][0].slice(4), f1[0][1].slice(2)],
+							data: {"total":filter_data.length, "rows":filter_data}
+						});
+			};
+			
+			function reset(){
+				var f1 = showGrid(data);
+				$("#combo").combobox("setValue", "规划线路");
+				$("#text").textbox("setValue","");
+				$("#real").datagrid({
+							toolbar: "#tb",
+							fit: true,
+							title: params.param1.split('-')[0]+params.param1.split('-')[1]+"货量装载率统计",
+							frozenColumns:[f1[0][0].slice(0,4), f1[0][1].slice(0,2)],
+							columns: [f1[0][0].slice(4), f1[0][1].slice(2)],
+							data: {"total":f1[1].length, "rows":f1[1]}
+						});
+			}
+		
+				
+		</script>
+	<head>
+	<body>
+		<div id = "main" class = "easyui-layout" fit = "true">
+			<div data-option = "region: 'center'" style = "height: 100%">
+				<table id = "real"></table>
+				<div id = "tb">
+					查询条件：&nbsp;
+					<select id = "combo" class = "easyui-combobox" style = "width: 80px">
+						<option value = 1>规划线路</option>
+						<option value = 2>班车编码</option>
+						<option value = 3>分段线路</option>
+					</select>
+					&nbsp;&nbsp;&nbsp;&nbsp;查询内容：&nbsp;
+					<input id = "text" class="easyui-textbox" style = "width: 150px"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+					<a id = 'search' class="easyui-linkbutton" iconCls="icon-search" onclick = "filter()">查询</a>&nbsp;&nbsp;
+					<a href="#"  id = 'save' class="easyui-linkbutton" iconCls="icon-save">导出</a>
+				</div>
+			</div>
+			
+		</div>
+	</body>
+</html>

@@ -32,8 +32,8 @@
 		
 			var data,
 				method = "POST", 
-				DATA_URL = "http://10.9.45.64:8080/tss/data/json/2150", 
-				params = {"param1": "2016-07-08"};
+				DATA_URL = "http://10.9.45.64:8080/tss/data/json/2150",
+				params = {"param1": "2016-07-20"};
 				
 			
 			$(function(){
@@ -50,18 +50,40 @@
 						$("#real").datagrid({
 							toolbar: "#tb",
 							fit: true,
-							title: params.param1.split('-')[0]+params.param1.split('-')[1]+"货量装载率统计",
+							pagination:true, 
+							//title: params.param1.split('-')[0]+params.param1.split('-')[1]+"货量装载率统计",
 							frozenColumns:[f1[0][0].slice(0,4), f1[0][1].slice(0,2)],
 							columns: [f1[0][0].slice(4), f1[0][1].slice(2)],
-							data: {"total":f1[1].length, "rows":f1[1]}
+							data: f1[1].slice(0,20)
+						});
+						
+						var page = $("#real").datagrid("getPager");
+						$(page).pagination({
+							total: f1[1].length,
+							pageSize: 20,
+							pageList: [20, 50, 100],
+							beforePageText: '第',
+							afterPageText: '页共 {pages} 页',
+							displayMsg: '当前显示 {from} - {to} 条记录/共 {total} 条记录',
+							onSelectPage:function (pageNo, pageSize) { 
+								var start = (pageNo - 1) * pageSize; 
+								var end = start + pageSize; 
+								$("#real").datagrid("loadData", f1[1].slice(start, end)); 
+								page.pagination('refresh', { 
+									total:f1[1].length, 
+									pageNumber:pageNo 
+								}); 
+							} 
 						});
 					}
 				});	
 				
+				//展示界面信息导出
 				$("#save").click(function(){
 					$(this)[0].download = params.param1.split('-')[0]+params.param1.split('-')[1]+"货量装载率统计.csv";
 					this.href = "data:text/csv;charset=utf-8,\ufeff" + encodeURIComponent(saveTable(f1));
 				});
+				
 					
 			});
 
@@ -129,6 +151,7 @@
 				return [chtml, gridData];
 			}
 			
+			//汇总表导出
 			function saveTable(data){
 				var str = "";
 				var title = data[0]
@@ -201,20 +224,20 @@
 						});
 			};
 			
-			function reset(){
-				var f1 = showGrid(data);
-				$("#combo").combobox("setValue", "规划线路");
-				$("#text").textbox("setValue","");
-				$("#real").datagrid({
-							toolbar: "#tb",
-							fit: true,
-							title: params.param1.split('-')[0]+params.param1.split('-')[1]+"货量装载率统计",
-							frozenColumns:[f1[0][0].slice(0,4), f1[0][1].slice(0,2)],
-							columns: [f1[0][0].slice(4), f1[0][1].slice(2)],
-							data: {"total":f1[1].length, "rows":f1[1]}
-						});
+			function save_origin_data(data){
+				var str = "";
+				for(var key in data[0]){
+					str += data[0][key] + ",";
+				}
+				str = str.substr(0, str.length-1) + "\n";
+				for(var i = 1; i < data.length; i++){
+					for(var key in data[i]){
+						str += data[i][key] + ",";
+					}
+					str = str.substr(0, str.length-1) + "\n";
+				}
+				return str;
 			}
-		
 				
 		</script>
 	<head>
@@ -234,8 +257,7 @@
 					<a id = 'search' class="easyui-linkbutton" iconCls="icon-search" onclick = "filter()">查询</a>&nbsp;&nbsp;
 					<a href="#"  id = 'save' class="easyui-linkbutton" iconCls="icon-save">导出</a>
 				</div>
-			</div>
-			
+			</div>	
 		</div>
 	</body>
 </html>

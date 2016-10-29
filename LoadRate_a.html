@@ -30,12 +30,107 @@
 		</style>
 		<script type = "text/javascript">
 		
-			var data,
+			var data1,data2,data3,
 				method = "POST", 
-				DATA_URL = "http://10.9.45.64:8080/tss/data/json/2150",
-				params = {"param1": "2016-07-20"};
-				
+				DATA_URL_1 = "http://10.9.45.68:8080/tss/data/json/2150", //实际装载率
+				DATA_URL_2 = "http://10.9.45.68:8080/tss/data/json/2153", //理论装载率
+				DATA_URL_3 = "http://10.9.45.68:8080/tss/data/json/2163", //差值
+				params = {"param1": "2016-10-20"};
+			var d = parseInt(params.param1.split("-")[2]);
 			
+			//动态列名个数（时间区间）,默认只取参数当月
+			var var_cols = function(){
+				var daylist = [];
+				for(var i = d; i > 0 ; i--){
+					y = params.param1.substr(0,params.param1.length-2)+ ((i > 9)?i:("0"+i));
+					daylist.push(y);
+				}
+				return daylist;
+			}
+			
+			//理论装载率列名，list为对应的中文名
+			var Theory_title = function(){
+				var cols = [];
+				cols.push({field: "shuttle", title: "班车号", width: "8%", align: "center"});
+				cols.push({field: "route_name", title: "车线名称", width: "8%", align: "center"});
+				cols.push({field: "route_type", title: "车线类型", width: "8%", align: "center"});
+				cols.push({field: "truck_type", title: "车型", width: "8%", align: "center"});
+				cols.push({field: "route", title: "分段线路", width: "8%", align: "center"});
+				cols.push({field: "w1", title: "ab(bc)货量", width: "8%", align: "center"});
+				cols.push({field: "w2", title: "ac货量", width: "8%", align: "center"});
+				cols.push({field: "weight", title: "分段货量", width: "8%", align: "center"});
+				cols.push({field: "rate", title: "分段装载率", width: "8%", align: "center"});
+				return cols;
+			}
+			
+			var Actual_title = function(){
+				var cols = [], temp = [];
+				temp.push({field: "shuttle", title: "班车号", rowspan: 2, width: "8%", align: "center"});
+				temp.push({field: "route_name", title: "规划车线", rowspan: 2, width: "8%", align: "center"});
+				temp.push({field: "route", title: "分段线路", rowspan: 2, width: "8%", align: "center"});
+				temp.push({field: "day", title: "月均值", width: "8%", colspan: 2, align: "center"});
+				for(var i = 0; i < var_cols.length; i++){
+					temp.push({field: "day"+i+1, title: var_cols[i], width: "8%", colspan: 2, align: "center"});
+				}
+				cols.push(temp);
+				temp = [];
+				for(var i = 0; i <= var_cols.length; i++){
+					temp.push({field: "weight"+i, title: "货量", width: "8%", align: "center"});
+					temp.push({field: "rate"+i, title: "装载率", width: "8%", align: "center"});
+				}
+				cols.push(temp);
+				return cols;
+			}
+			
+			var Diff_title = function(){
+				var cols = [], temp = [];
+				temp.push({field: "shuttle", title: "班车号", rowspan: 2, width: "8%", align: "center"});
+				temp.push({field: "route_name", title: "规划车线", rowspan: 2, width: "8%", align: "center"});
+				temp.push({field: "model", title: "经停模式", rowspan: 2, width: "8%", align: "center"});
+				temp.push({field: "truck_type", title: "车型", width: "8%", colspan: 2, align: "center"});
+				temp.push({field: "route", title: "分段线路", width: "8%", colspan: 2, align: "center"});
+				for(var i = 0; i < var_cols.length; i++){
+					temp.push({field: "day"+i+1, title: var_cols[i], width: "8%", colspan: 2, align: "center"});
+				}
+				cols.push(temp);
+				temp = [];
+				for(var i = 0; i < var_cols.length; i++){
+					temp.push({field: "r_th"+i+1, title: "理论装载率", width: "8%", align: "center"});
+					temp.push({field: "r_ac"+i+1, title: "实际装载率", width: "8%", align: "center"});
+				}
+				cols.push(temp);
+				return cols;
+			}
+				
+			$(function(){
+			
+				//理论装载率日期框初始值
+				$("input[required='required']:first").datebox('setValue', params.param1.substr(0,params.param1.length-2)+ ((d > 9)?d:("0"+d)));
+				
+				//差值日期框初始值
+				$("input[required='required']:eq(1)").datebox('setValue', params.param1.substr(0,params.param1.length-2)+ ((d-7>0)?((d-7>9)?(d-7):("0"+(d-7))):"01"));
+				$("input[required='required']:last").datebox('setValue', params.param1.substr(0,params.param1.length-2)+ ((d > 9)?d:("0"+d)));
+				tssJS.ajax({
+					url: DATA_URL_3,
+					params: params,
+					method: method,
+					type: "json",
+					waiting: true,
+					ondata: function(){
+						data3 = this.getResponseJSON();
+						//date = $("input[required='required']:first").datebox('getValue');
+						//var func = TheoryGrid(data2, date, "鞍山-沈阳-鞍山");	
+						from_date = $("input[required='required']:eq(1)").datebox('getValue');
+						to_date = $("input[required='required']:last").datebox('getValue');
+						key = $("select:first ").combobox('getValue');
+						condition = $("select:last ").combobox('getText');
+						value = $("#tb3 .text").textbox('getValue');
+						var func = DiffGrid(data3, from_date, to_date, key, condition, value);	
+					}
+				})
+			})
+				
+/*			
 			$(function(){
 			
 				tssJS.ajax({
@@ -45,7 +140,7 @@
 					type: "json",
 					waiting: true,
 					ondata: function(){
-						data =  this.getResponseJSON();
+						data1 =  this.getResponseJSON();
 						f1 = showGrid(data);
 						$("#real").datagrid({
 							toolbar: "#tb",
@@ -86,7 +181,145 @@
 				
 					
 			});
-
+*/			
+			//理论装载率对象
+			function theory_obj(shuttle,route_name,route_type,truck_type,route,w1,w2,weight,rate){
+				this.shuttle = shuttle;
+				this.route_name = route_name;
+				this.route_type = route_type;
+				this.truck_type = truck_type;
+				this.route = route;
+				this.w1 = w1;
+				this.w2 = w2;
+				this.weight = weight;
+				this.rate = rate;
+				
+				return this;
+			}
+			
+			//实际装载率动态列名对象
+			function actual_obj(shuttle,route_name, route,cols){
+				this.shuttle = shuttle;
+				this.route_name = route_name;
+				this.route = route;
+				//0为累计项定义
+				for(var i = 0; i <= cols.length; i++){
+					eval("this.weight"+i+" = '-'");
+					eval("this.rate"+i+" = '-'");
+				}
+				return  this;
+			}
+			//差值对象
+			function diff_obj(shuttle, route_name, model, truck_type, route, cols){
+				this.shuttle = shuttle;
+				this.route_name = route_name;
+				this.model = model;
+				this.truck_type = truck_type;
+				this.route = route;
+				for(var i = 1; i <= cols.length; i++){
+					eval("this.r_ac"+i+" = '-'");
+					eval("this.r_th"+i+" = '-'");
+				};
+				return this;
+			}
+			
+			//理论装载率
+			function TheoryGrid(data, date, route){
+				var json = {}, rows = [];
+				var temp;
+				$.each(data, function(i,item){
+					if(item.day == date){
+						if(route == ""){
+							temp = new theory_obj(item.shuttle_code,item.route_name,item.route_type,item.truck_type,item.route,item.w1,item.w2,item.weight,item.rate);
+							rows.push(temp);
+						}else{
+							if(item.route_name == route){
+								temp = new theory_obj(item.shuttle_code,item.route_name,item.route_type,item.truck_type,item.route,item.w1,item.w2,item.weight,item.rate);
+								rows.push(temp);
+							}
+						}
+					}
+				});
+				json["total"] = rows.length;
+				json["rows"] = rows;
+				return json;
+			}
+			
+			//实际装载率
+			function ActualGrid(data,route){
+				var json = {}, rows = [];
+				var cols = var_cols();
+				var temp, idx, sum_weight = 0, sum_rate = 0, j = 0;
+				$.each(data, function(i, item){
+					if((route != "" && item.route_name == route) || route == ""){
+						if(temp == undefined){
+							temp = new actual_obj(item.shuttle_code,item.route_name,item.in_to,cols);
+						}
+						if(temp.shuttle + "_" + temp.route != item.shuttle_code + "_" + item.in_to && j != 0){
+							temp["weight0"] = sum_weight/j;
+							temp["rate0"] = sum_rate/j;
+							rows.push(temp);
+							temp = new actual_obj(item.shuttle_code,item.route_name,item.in_to,cols);
+							j = 0;
+							sum_weight = 0;
+							sum_rate = 0;
+						}
+						idx = $.inArray(item.day,cols)+1;
+						eval("temp['weight"+idx+"'] = item.weight");
+						eval("temp['rate"+idx+"'] = item.loadrate");
+						sum_weight = sum_weight + item.weight;
+						sum_rate = sum_rate + parseFloat(item.loadrate); 
+						j = j + 1;
+					}
+				});
+				temp["weight0"] = sum_weight/j;
+				temp["rate0"] = sum_rate/j;
+				rows.push(temp);
+				
+				json.total = rows.length;
+				json.rows = rows;
+				
+				return json;
+			}
+			
+			//理论实际差值
+			function DiffGrid(data, from_date, to_date, key, condition, value){
+				var json = {}, rows = [], cols = [];
+				var temp, rule, idx;
+				//日期时间区间
+				from_date = parseInt(from_date.split("-")[2]);
+				to_date = parseInt(to_date.split("-")[2]);
+				for(var i = to_date; i >= from_date; i--){
+					cols.push((params.param1.substr(0,params.param1.length-2)+(i>9?i:"0"+i)));
+				}
+				$.each(data, function(i, item){
+					var day = parseInt(item.day.split("-")[2]);
+					if(day >= from_date && day <= to_date){
+						if(value != ""){
+							eval("rule = item."+key+condition+value);
+						};
+						if(rule || rule == undefined){
+							if(temp == undefined){
+								temp = new diff_obj(item.shuttle_code, item.route_name, item.model, item.truck_type, item.in_to, cols);
+							};
+							if(temp.shuttle + "_" + temp.route != item.shuttle_code + "_" + item.in_to){
+								rows.push(temp);
+								temp = new diff_obj(item.shuttle_code, item.route_name, item.model, item.truck_type, item.in_to, cols);
+							}
+							idx = $.inArray(item.day,cols)+1;
+							eval("temp['r_ac"+idx+"'] = item.r_ac");
+							eval("temp['r_th"+idx+"'] = item.r_th");
+						}
+					}
+				})
+				rows.push(temp);
+				
+				json.total = rows.length;
+				json.rows = rows;
+				
+				return json;
+			}
+			
 			function showGrid(data){
 				var daylist = [], gridData = [], route_obj = {};
 				$.each(data, function(i, item){
@@ -242,20 +475,52 @@
 		</script>
 	<head>
 	<body>
-		<div id = "main" class = "easyui-layout" fit = "true">
-			<div data-option = "region: 'center'" style = "height: 100%">
-				<table id = "real"></table>
-				<div id = "tb">
+		<div id = "main" class = "easyui-tabs" fit = "true">
+			<div title = "tab1" style = "height: 100%">
+				<table id = "actual_loadrate"></table>
+				<div id = "tb1" class = "tb">
+					车线名称：&nbsp;&nbsp;
+					<input class="easyui-textbox text" style = "width: 150px"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+					<a class="easyui-linkbutton search" iconCls="icon-search">查询</a>&nbsp;&nbsp;
+					<a href="#" class="easyui-linkbutton save" iconCls="icon-save">导出</a>
+				</div>
+			</div>
+			<div title = "tab2" style = "height: 100%">
+				<table id = "theory_loadrate"></table>
+				<div id = "tb2" class = "tb">
+					日期: &nbsp;
+					<input type="text" class="easyui-datebox dd" required="required">
+					车线名称：&nbsp;
+					<input class="easyui-textbox text" style = "width: 150px"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+					<a class="easyui-linkbutton search" iconCls="icon-search">查询</a>&nbsp;&nbsp;
+					<a href="#"  class="easyui-linkbutton save" iconCls="icon-save">导出</a>
+				</div>
+			</div>	
+			<div title = "tab3" style = "height: 100%">
+				<table id = "diff_loadrate"></table>
+				<div id = "tb3" class = "tb">
+					从日期：&nbsp;
+					<input type="text" class="easyui-datebox dd" required="required">
+					到日期：&nbsp;
+					<input type="text" class="easyui-datebox dd" required="required">
 					查询条件：&nbsp;
-					<select id = "combo" class = "easyui-combobox" style = "width: 80px">
-						<option value = 1>规划线路</option>
-						<option value = 2>班车编码</option>
-						<option value = 3>分段线路</option>
-					</select>
-					&nbsp;&nbsp;&nbsp;&nbsp;查询内容：&nbsp;
-					<input id = "text" class="easyui-textbox" style = "width: 150px"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-					<a id = 'search' class="easyui-linkbutton" iconCls="icon-search" onclick = "filter()">查询</a>&nbsp;&nbsp;
-					<a href="#"  id = 'save' class="easyui-linkbutton" iconCls="icon-save">导出</a>
+					<span>
+						<select class = "easyui-combobox" style = "width: 80px">
+							<option value = "route_name" checked = "checked">车线名称</option>
+							<option value = "r_th">理论装载率</option>
+							<option value = "r_ac">实际装载率</option>
+						</select>
+						<select class = "easyui-combobox" style = "width: 80px">
+							<option value = 1 checked = "checked">=</option>
+							<option value = 2>&gt;</option>
+							<option value = 3>&lt;</option>
+							<option value = 4>&gt;=</option>
+							<option value = 5>&lt;=</option>
+						</select>
+					<span>
+					<input class="easyui-textbox text" style = "width: 100px"/>
+					<a class="easyui-linkbutton search" iconCls="icon-search">查询</a>
+					<a href="#" class="easyui-linkbutton save" iconCls="icon-save">导出</a>
 				</div>
 			</div>	
 		</div>

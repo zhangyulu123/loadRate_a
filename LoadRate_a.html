@@ -82,7 +82,8 @@
 				return cols;
 			}
 			
-			var Diff_title = function(){
+			//cols选择的日期动态列
+			var Diff_title = function(cols){
 				var cols = [], temp = [];
 				temp.push({field: "shuttle", title: "班车号", rowspan: 2, width: "8%", align: "center"});
 				temp.push({field: "route_name", title: "规划车线", rowspan: 2, width: "8%", align: "center"});
@@ -94,7 +95,7 @@
 				}
 				cols.push(temp);
 				temp = [];
-				for(var i = 0; i < var_cols.length; i++){
+				for(var i = 0; i < cols.length; i++){
 					temp.push({field: "r_th"+i+1, title: "理论装载率", width: "8%", align: "center"});
 					temp.push({field: "r_ac"+i+1, title: "实际装载率", width: "8%", align: "center"});
 				}
@@ -122,14 +123,18 @@
 						//var func = TheoryGrid(data2, date, "鞍山-沈阳-鞍山");	
 						from_date = $("input[required='required']:eq(1)").datebox('getValue');
 						to_date = $("input[required='required']:last").datebox('getValue');
-						key = $("select:first ").combobox('getValue');
-						condition = $("select:last ").combobox('getText');
-						value = $("#tb3 .text").textbox('getValue');
-						var func = DiffGrid(data3, from_date, to_date, key, condition, value);	
+						//DiffGrid(data3, from_date, to_date);	
 					}
+				});
+				
+				//差值分析查询按钮
+				$(".search:last").click(function(){
+					func = DiffGrid(data3, from_date, to_date);
 				})
+				
 			})
 				
+			
 /*			
 			$(function(){
 			
@@ -193,7 +198,6 @@
 				this.w2 = w2;
 				this.weight = weight;
 				this.rate = rate;
-				
 				return this;
 			}
 			
@@ -282,10 +286,22 @@
 				return json;
 			}
 			
-			//理论实际差值
-			function DiffGrid(data, from_date, to_date, key, condition, value){
+			//理论实际差值,返回json和查询日期表头
+			function DiffGrid(data, from_date, to_date){
 				var json = {}, rows = [], cols = [];
 				var temp, rule, idx;
+				var keys = [], conditions = [], values = [], logic = [],str = "";
+				
+				//所有筛选条件值
+				for(var i = 0; i < $(".values").length; i++){
+					eval("keys.push($('.keys:nth("+ i +")').combobox('getValue'))");
+					eval("conditions.push($('.conditions:nth("+ i +")').combobox('getText'))");
+					eval("values.push($('.values:nth("+ i +")').textbox('getValue'))");
+					if(i > 0){
+						eval("logic.push($('.logic:nth("+ (i-1) +")').combobox('getValue'))");
+					}
+				}
+				
 				//日期时间区间
 				from_date = parseInt(from_date.split("-")[2]);
 				to_date = parseInt(to_date.split("-")[2]);
@@ -295,8 +311,12 @@
 				$.each(data, function(i, item){
 					var day = parseInt(item.day.split("-")[2]);
 					if(day >= from_date && day <= to_date){
-						if(value != ""){
-							eval("rule = item."+key+condition+value);
+						//载筛选条件值不为空
+						if(values[0] != ""){
+							for(var j = 0; j < values.length-1; j++){
+								str += "item."+keys[j]+conditions[j]+values[j]+logic[j];
+							}
+							eval("rule = " + str + "item."+keys[j]+conditions[j]+values[j]);
 						};
 						if(rule || rule == undefined){
 							if(temp == undefined){
@@ -317,9 +337,29 @@
 				json.total = rows.length;
 				json.rows = rows;
 				
-				return json;
+				return [json, cols];
 			}
 			
+			//增加(1)或删除(0)查询行
+			function filter(obj, func){
+				if(func == 1){
+					var str = "<span class = 'filter'><select class = 'easyui-combobox logic'><option value = '&&'>并且</option><option value = '||'>或者</option></select><select class = 'easyui-combobox keys' style = 'width: 100px'>"+"<option value = 'route_name' checked = 'checked'>车线名称</option>"+
+						  "<option value = 'r_th'>理论装载率</option>" + "<option value = 'r_ac'>实际装载率</option></select>" + 
+						  "<select class = 'easyui-combobox conditions' style = 'width: 40px'>" + "<option value = 1 checked = 'checked'>=</option>"+
+						  "<option value = 2>&gt;</option>" + "<option value = 3>&lt;</option>" + "<option value = 4>&gt;=</option>" +
+						  "<option value = 5>&lt;=</option></select>" + "<input class='easyui-textbox values' style = 'width: 100px'/></span>";
+					$(obj).before(str);	
+					//重新渲染
+					$.parser.parse($("#tb3 .filter:last"));
+				}else{
+					$("#tb3 .filter:last").remove();
+				}
+			}
+			
+			function print_data(json, title){
+				
+			}
+/*			
 			function showGrid(data){
 				var daylist = [], gridData = [], route_obj = {};
 				$.each(data, function(i, item){
@@ -471,7 +511,7 @@
 				}
 				return str;
 			}
-				
+*/				
 		</script>
 	<head>
 	<body>
@@ -498,31 +538,33 @@
 			</div>	
 			<div title = "tab3" style = "height: 100%">
 				<table id = "diff_loadrate"></table>
+				从日期：&nbsp;
+				<input type="text" class="easyui-datebox dd" required="required">
+				到日期：&nbsp;
+				<input type="text" class="easyui-datebox dd" required="required">
 				<div id = "tb3" class = "tb">
-					从日期：&nbsp;
-					<input type="text" class="easyui-datebox dd" required="required">
-					到日期：&nbsp;
-					<input type="text" class="easyui-datebox dd" required="required">
 					查询条件：&nbsp;
 					<span>
-						<select class = "easyui-combobox" style = "width: 80px">
+						<select class = "easyui-combobox keys" style = "width: 100px">
 							<option value = "route_name" checked = "checked">车线名称</option>
 							<option value = "r_th">理论装载率</option>
 							<option value = "r_ac">实际装载率</option>
 						</select>
-						<select class = "easyui-combobox" style = "width: 80px">
+						<select class = "easyui-combobox conditions" style = "width: 40px">
 							<option value = 1 checked = "checked">=</option>
 							<option value = 2>&gt;</option>
 							<option value = 3>&lt;</option>
 							<option value = 4>&gt;=</option>
 							<option value = 5>&lt;=</option>
 						</select>
-					<span>
-					<input class="easyui-textbox text" style = "width: 100px"/>
-					<a class="easyui-linkbutton search" iconCls="icon-search">查询</a>
+						<input class="easyui-textbox values" style = "width: 100px"/>
+					</span>
+					<a class="easyui-linkbutton" iconCls = "icon-add" onclick = "add_filter(this,1);" ></a>
+					<a class="easyui-linkbutton" iconCls = "icon-no" onclick = "del_filter(this,0);" ></a>
+					<a class="easyui-linkbutton search" iconCls="icon-search" >查询</a>
 					<a href="#" class="easyui-linkbutton save" iconCls="icon-save">导出</a>
-				</div>
-			</div>	
-		</div>
+				</div>	
+			</div>
+		</div>	
 	</body>
 </html>
